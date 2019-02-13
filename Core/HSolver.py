@@ -44,6 +44,7 @@ class Helmholtz(object):
     def __init__(self, domain, para={'kappa': 5.0}):
         self.domain = domain
         self.kappa = para['kappa']
+        self.order = 2
         self.haveFunctionSpace = False
         
     def modifyDomain(self, domain):
@@ -51,14 +52,38 @@ class Helmholtz(object):
         self.haveFunctionSpace = False
         
     def geneFunctionSpace(self):
-        P2 = fe.FiniteElement('P', fe.triangle, 2)
+        P2 = fe.FiniteElement('P', fe.triangle, self.order)
         element = fe.MixedElement([P2, P2])
         if self.domain.haveMesh == False:
             self.domain.geneMesh()
         self.V = fe.FunctionSpace(self.domain.mesh, element)
         self.haveFunctionSpace = True
+        
+    def getFunctionSpace(self, typem):
+        if typem == 'real':
+            return fe.FunctionSpace(self.domain.mesh, 'P', self.order)
+        elif typem == 'imag':
+            return fe.FunctionSpace(self.domain.mesh, 'P', self.order)
+        elif typem == 'full':
+            return self.V
+        
+    def get_s1s2(self, V):
+        xx, yy, dPML, sig0_, p_ = self.domain.xx, self.domain.yy, self.domain.dPML,\
+                                  self.domain.sig0, self.domain.p
+        # define the coefficents induced by PML
+        sig1 = fe.Expression('x[0] > x1 && x[0] < x1 + dd ? sig0*pow((x[0]-x1)/dd, p) : (x[0] < 0 && x[0] > -dd ? sig0*pow((-x[0])/dd, p) : 0)', 
+                     degree=3, x1=xx, dd=dPML, sig0=sig0_, p=p_)
+        sig2 = fe.Expression('x[1] > x2 && x[1] < x2 + dd ? sig0*pow((x[1]-x2)/dd, p) : (x[1] < 0 && x[1] > -dd ? sig0*pow((-x[1])/dd, p) : 0)', 
+                     degree=3, x2=yy, dd=dPML, sig0=sig0_, p=p_)
+        const1 = fe.interpolate(fe.Constant(1.0), V)
+        sig1_ = fe.interpolate(sig1, V)
+        sig2_ = fe.interpolate(sig2, V)
+        cR = const1 - sig1_*sig2_
+        cI = sig1_ + sig2_
+        return cR, cI        
+        
     
-    def geneForwardMatrix(self, q_fun=fe.Constant(0.0), fR=fe.Constant(0.0), \
+    def geneForwardMatrix(self, flag='full', q_fun=fe.Constant(0.0), fR=fe.Constant(0.0), \
                           fI=fe.Constant(0.0)):
         if self.haveFunctionSpace == False:
             self.geneFunctionSpace()
@@ -92,12 +117,16 @@ class Helmholtz(object):
         def sigI(v):
             return fe.dot(sI, fe.nabla_grad(v))
         
-        F1 = - fe.inner(sigR(duR)-sigI(duI), fe.nabla_grad(u_R))*(fe.dx) \
-            - fe.inner(sigR(duI)+sigI(duR), fe.nabla_grad(u_I))*(fe.dx) \
-            - fR*u_R*(fe.dx) - fI*u_I*(fe.dx)
+        if flag == 'full':
+            F1 = - fe.inner(sigR(duR)-sigI(duI), fe.nabla_grad(u_R))*(fe.dx) \
+                - fe.inner(sigR(duI)+sigI(duR), fe.nabla_grad(u_I))*(fe.dx) \
+                - fR*u_R*(fe.dx) - fI*u_I*(fe.dx)
         
-        a2 = fe.inner(angl_fre2*q_fun*(cR*duR-cI*duI), u_R)*(fe.dx) \
-             + fe.inner(angl_fre2*q_fun*(cR*duI+cI*duR), u_I)*(fe.dx) \
+            a2 = fe.inner(angl_fre2*(fe.Constant(1.0)+q_fun)*(cR*duR-cI*duI), u_R)*(fe.dx) \
+                 + fe.inner(angl_fre2*(fe.Constant(1.0)+q_fun)*(cR*duI+cI*duR), u_I)*(fe.dx) 
+        elif flag == 'simple':
+            a2 = fe.inner(angl_fre2*(fe.Constant(1.0)+q_fun)*(cR*duR-cI*duI), u_R)*(fe.dx) \
+                 + fe.inner(angl_fre2*(fe.Constant(1.0)+q_fun)*(cR*duI+cI*duR), u_I)*(fe.dx) 
         
         # define boundary conditions
         def boundary(x, on_boundary):
@@ -106,23 +135,38 @@ class Helmholtz(object):
         bc = [fe.DirichletBC(self.V.sub(0), fe.Constant(0.0), boundary), \
               fe.DirichletBC(self.V.sub(1), fe.Constant(0.0), boundary)]
         
-        a1, L1 = fe.lhs(F1), fe.rhs(F1)
         self.u = fe.Function(self.V)
-        self.A1 = fe.assemble(a1)
-        self.b1 = fe.assemble(L1)
-        self.A2 = fe.assemble(a2)
-        bc[0].apply(self.A1, self.b1)
-        bc[1].apply(self.A1, self.b1)
-        bc[0].apply(self.A2)
-        bc[1].apply(self.A2)
-        self.A = self.A1 + self.A2
         
-    def addPointSource(self, points=[(1, 2)], magnitude=[1]):
+        if flag == 'full':
+            a1, L1 = fe.lhs(F1), fe.rhs(F1)
+            self.A1 = fe.assemble(a1)
+            self.b1 = fe.assemble(L1)
+            self.A2 = fe.assemble(a2)
+            bc[0].apply(self.A1, self.b1)
+            bc[1].apply(self.A1, self.b1)
+            bc[0].apply(self.A2)
+            bc[1].apply(self.A2)
+            self.A = self.A1 + self.A2
+        elif flag == 'simple':
+            self.A2 = fe.assemble(a2)
+            bc[0].apply(self.A2)
+            bc[1].apply(self.A2)
+            self.A = self.A1 + self.A2
+   # end of geneForwardMatrix   
+        
+    def addPointSourceR(self, points=[(1, 2)], magnitude=[1]):
         if len(points) != len(magnitude):
             print('The length of points and magnitude must be equal!')
             
         for i in range(len(magnitude)):
             fe.PointSource(self.V.sub(0), fe.Point(points[i]), magnitude[i]).apply(self.b1)
+            
+    def addPointSourceI(self, points=[(1, 2)], magnitude=[1]):
+        if len(points) != len(magnitude):
+            print('The length of points and magnitude must be equal!')
+            
+        for i in range(len(magnitude)):
+            fe.PointSource(self.V.sub(1), fe.Point(points[i]), magnitude[i]).apply(self.b1)
     
     def solve(self):
         self.u = fe.Function(self.V)
