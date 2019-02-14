@@ -58,8 +58,8 @@ for kk in range(len(kappa_all)):
         #end = time.time()
         #print(end-start)
         
-        solR_all[:, kk+th] = measure.sampling(Fsol.uReal) 
-        solI_all[:, kk+th] = measure.sampling(Fsol.uImag)
+        solR_all[:, iter_num] = measure.sampling(Fsol.uReal) 
+        solI_all[:, iter_num] = measure.sampling(Fsol.uImag)
         # track the iteration
         iter_num += 1
         print('Iterate ', iter_num, ' steps')

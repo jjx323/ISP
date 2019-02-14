@@ -68,8 +68,8 @@ for freIndx in range(Nkappa):  # loop for frequencies
         # calculate residual
         uRM = measure.sampling(Fsol.uReal)
         uIM = measure.sampling(Fsol.uImag)
-        resR = uRT[:, freIndx+angIndx] - uRM
-        resI = uIT[:, freIndx+angIndx] - uIM
+        resR = uRT[:, iter_num] - uRM
+        resI = uIT[:, iter_num] - uIM
         # ---------------------------------------------------------------------
         # solve adjoint problem
         # init the source function
