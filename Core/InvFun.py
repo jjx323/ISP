@@ -1,5 +1,6 @@
 import numpy as np 
 import matplotlib.pyplot as plt 
+from mpl_toolkits.mplot3d import Axes3D
 import fenics as fe
 
 
@@ -25,6 +26,22 @@ def genePoints(num=40, typem='full', domainPara={'xx': 2.0, 'yy': 2.0}):
         for i in range(numE):
             points.append((Xaxis[i], yr))
     return points
+
+
+def my_draw3D(fun, ax):
+    NMX, NMY = 200, 200
+    xx = np.linspace(0, ax[0], NMX)
+    yy = np.linspace(0, ax[1], NMY)
+    M = np.zeros((NMX, NMY))
+    for i in range(NMX):
+        for j in range(NMY):
+            M[i,j] = fun((xx[i], yy[j]))
+    XX, YY = np.meshgrid(xx, yy)
+    
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    fig1 = ax.plot_surface(XX, YY, M)
+    return fig1
 
 
 def trueScatterer(expre='0.0', de=0):
@@ -74,4 +91,5 @@ class Sample(object):
             
         return measures
     
+
 

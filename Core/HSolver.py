@@ -59,15 +59,15 @@ class Helmholtz(object):
         self.V = fe.FunctionSpace(self.domain.mesh, element)
         self.haveFunctionSpace = True
         
-    def getFunctionSpace(self, typem):
+    def getFunctionSpace(self, typem, order=2):
         if typem == 'real':
-            return fe.FunctionSpace(self.domain.mesh, 'P', self.order)
+            return fe.FunctionSpace(self.domain.mesh, 'P', order)
         elif typem == 'imag':
-            return fe.FunctionSpace(self.domain.mesh, 'P', self.order)
+            return fe.FunctionSpace(self.domain.mesh, 'P', order)
         elif typem == 'full':
             return self.V
         
-    def get_s1s2(self, V):
+    def get_s1s2(self, V, flag='vector'):
         xx, yy, dPML, sig0_, p_ = self.domain.xx, self.domain.yy, self.domain.dPML,\
                                   self.domain.sig0, self.domain.p
         # define the coefficents induced by PML
@@ -78,8 +78,12 @@ class Helmholtz(object):
         const1 = fe.interpolate(fe.Constant(1.0), V)
         sig1_ = fe.interpolate(sig1, V)
         sig2_ = fe.interpolate(sig2, V)
-        cR = const1 - sig1_*sig2_
-        cI = sig1_ + sig2_
+        if flag == 'vector':
+            cR = const1.vector()[:] - sig1_.vector()[:]*sig2_.vector()[:]
+            cI = sig1_.vector()[:] + sig2_.vector()[:]
+        elif flag == 'fun':
+            cR = const1 - sig1_*sig2_
+            cI = sig1_ + sig2_
         return cR, cI        
         
     
