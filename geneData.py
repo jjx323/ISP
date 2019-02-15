@@ -19,8 +19,8 @@ domain.geneMesh()
 
 equ_para = {'kappa': 0.0, 'theta': 0.0}
 
-theta_all = np.linspace(0, 2*np.pi, 10)
-kappa_all = [1.0, 2.0, 3.0, 4.0, 5.0] #, 6.0, 7.0, 8.0, 9.0, 10.0]
+theta_all = np.linspace(0, 2*np.pi, 20)
+kappa_all = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
 NN = len(theta_all)*len(kappa_all)
 NS = 400    # number of measuring points
 points = genePoints(NS, 'full', domain_para)
@@ -29,11 +29,11 @@ solR_all, solI_all = np.zeros((NS, NN)), np.zeros((NS, NN))
 
 # specify the forward solver and function space of the coefficients
 Fsol = Helmholtz(domain, equ_para)
-Vreal = Fsol.getFunctionSpace('real')
+Vreal, order = Fsol.getFunctionSpace('real')
 
 # sepcify the true scatterer function
-#qFunStr = '((0.5 <= x[0] && x[0] <= 1.5 && 0.5 <= x[1] && x[1] <= 1.5) ? 1 : 0)'
-qFunStr = '5*pow(3*(x[0]-1), 2)*(3*(x[1]-1))*exp(-(pow(3*(x[0]-1), 2)+pow(3*(x[1]-1), 2)))'
+qFunStr = '((0.5 <= x[0] && x[0] <= 1.5 && 0.5 <= x[1] && x[1] <= 1.5) ? 1 : 0)'
+#qFunStr = '5*pow(3*(x[0]-1), 2)*(3*(x[1]-1))*exp(-(pow(3*(x[0]-1), 2)+pow(3*(x[1]-1), 2)))'
 q_fun = fe.interpolate(trueScatterer(qFunStr, 3), Vreal)
 fR = fe.interpolate(fe.Constant(0.0), Vreal)
 fI = fe.interpolate(fe.Constant(0.0), Vreal)
@@ -68,8 +68,9 @@ for kk in range(len(kappa_all)):
 # solR_all has been saved in the file of dataR, with solutions of order 
 # frequency 1, angle 1, angle 2, ... , angle N, 
 # frequency 2, angle 1, angle 2, ... , angle N, ......
-np.save('/home/jjx323/Projects/ISP/Data/dataRc', solR_all)
-np.save('/home/jjx323/Projects/ISP/Data/dataIc', solI_all)
-
+#np.save('/home/jjx323/Projects/ISP/Data/dataRc', solR_all)
+#np.save('/home/jjx323/Projects/ISP/Data/dataIc', solI_all)
+np.save('/home/jjx323/Projects/ISP/Data/dataRsquare', solR_all)
+np.save('/home/jjx323/Projects/ISP/Data/dataIsquare', solI_all)
 # -----------------------------------------------------------------------------
 

@@ -134,7 +134,7 @@ np.save('/home/jjx323/Projects/ISP/Results/q_fun_vector', q_fun.vector()[:], \
         domain_para, ['P', order])
 # error
 plt.figure()
-plt.plot(error_all)
+plt.plot(error_all[0:-1:Ntheta])
 plt.show()
 print('L2 norm error is {:.2f}%'.format(error_all[-1]*100))  
 np.save('/home/jjx323/Projects/ISP/Results/errorAll', error_all)      
