@@ -5,21 +5,30 @@ import time
 
 from Core.HSolver import *
 from Core.InvFun import *
+from Core.AddNoise import *
 
 plt.close()
 # load the measuring data
-uRT = np.load('/home/jjx323/Projects/ISP/Data/dataRc.npy')
-uIT = np.load('/home/jjx323/Projects/ISP/Data/dataIc.npy')
+# [sol_all, theta_all, kappa_all, qStrT]
+dAR = np.load('/home/jjx323/Projects/ISP/Data/dataRc.npy')
+dAI = np.load('/home/jjx323/Projects/ISP/Data/dataIc.npy')
+uRT, uIT = dAR[0], dAI[0]
+theta_all, kappa_all = dAR[1], dAR[2]
+qStrT = dAR[3]
 
+# add noise to the data
+#shapeU = uRT.shape
+#for i in shapeU[1]:
+#    uRT[:,i] = addGaussianNoise(uRT[:,i], {'noise_level': 0.1, 'rate': 1})
+#    uIT[:,i] = addGaussianNoise(uIT[:,i], {'noise_level': 0.1, 'rate': 1})
+    
 # specify basic parameters
 domain_para = {'nx': 120, 'ny': 120, 'dPML': 0.15, 'xx': 2.0, 'yy': 2.0, \
 				'sig0': 1.5, 'p': 2.3}
 
 domain = Domain(domain_para)
 domain.geneMesh()
-
-theta_all = np.linspace(0, 2*np.pi, 10)
-kappa_all = [1.0, 2.0, 3.0, 4.0, 5.0]
+#
 Ntheta, Nkappa = len(theta_all), len(kappa_all)
 NN = Ntheta*Nkappa
 NS = 400    # number of measuring points
@@ -33,7 +42,6 @@ Asol = Helmholtz(domain, equ_para)
 Vreal, order = Fsol.getFunctionSpace('real')
 
 # specify the true scatterer for test
-qStrT = '5*pow(3*(x[0]-1), 2)*(3*(x[1]-1))*exp(-(pow(3*(x[0]-1), 2)+pow(3*(x[1]-1), 2)))'
 q_funT = fe.interpolate(trueScatterer(qStrT, 3), Vreal)
 eng2 = fe.assemble(fe.inner(q_funT, q_funT)*fe.dx)
 # init the scatterer 
@@ -46,7 +54,7 @@ fI = fe.interpolate(fe.Constant(0.0), Vreal)
 reg = Regu('L2_1')
 
 drawF = 'False'
-error_all = []
+error_all, q_fun_all = [], []
 # loop for inversion
 iter_num = 0
 flag = 'full'   # assemble with all of the coefficients
@@ -108,7 +116,8 @@ for freIndx in range(Nkappa):  # loop for frequencies
         #flag = 'simple'
         # track the iteration
         iter_num += 1
-        print('Iterate ', iter_num, ' steps')
+        print('kappa = {:2}; angle = {:3.2f}; iter_num = {:3}'.format(equ_para['kappa'], \
+              equ_para['theta'], iter_num))
         # evaluation of the error
         eng1 = fe.assemble(fe.inner(q_funT-q_fun, q_funT-q_fun)*fe.dx)
         error_temp = eng1/eng2
@@ -122,21 +131,22 @@ for freIndx in range(Nkappa):  # loop for frequencies
             expN = '/home/jjx323/Projects/ISP/ResultsFig/invQ' + str(iter_num) + '.eps'
             plt.savefig(expN, dpi=150)
             plt.close()
+    q_fun_all.append(q_fun.vector()[:])
 
 # postprocessing      
 fig2 = my_draw3D(q_fun, [2, 2])
 #plt.close()
 # save inversion results
-vtkfile = fe.File('/home/jjx323/Projects/ISP/ResultsFig/q_fun.pvd')
+vtkfile = fe.File('/home/jjx323/Projects/ISP/ResultsFig/q_fun_c.pvd')
 vtkfile << q_fun
 # save matrix and reconstruct info
-np.save('/home/jjx323/Projects/ISP/Results/q_fun_vector', q_fun.vector()[:], \
-        domain_para, ['P', order])
+np.save('/home/jjx323/Projects/ISP/Results/q_fun_vector_c', [q_fun.vector()[:], \
+        domain_para, ['P', order], q_fun_all])
 # error
 plt.figure()
 plt.plot(error_all[0:-1:Ntheta])
 plt.show()
-print('L2 norm error is {:.2f}%'.format(error_all[-1]*100))  
-np.save('/home/jjx323/Projects/ISP/Results/errorAll', error_all)      
+print('The final L2 norm error is {:.2f}%'.format(error_all[-1]*100))  
+np.save('/home/jjx323/Projects/ISP/Results/errorAll_c', error_all)      
 
 
