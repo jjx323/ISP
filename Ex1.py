@@ -17,11 +17,12 @@ theta_all, kappa_all = dAR[1], dAR[2]
 qStrT = dAR[3]
 
 # add noise to the data
-#shapeU = uRT.shape
-#for i in shapeU[1]:
-#    uRT[:,i] = addGaussianNoise(uRT[:,i], {'noise_level': 0.1, 'rate': 1})
-#    uIT[:,i] = addGaussianNoise(uIT[:,i], {'noise_level': 0.1, 'rate': 1})
-    
+shapeU = uRT.shape
+for i in range(shapeU[1]):
+    uRT[:,i], _ = addGaussianNoise(uRT[:,i], {'noise_level': 0.5, 'rate': 1})
+    uIT[:,i], _ = addGaussianNoise(uIT[:,i], {'noise_level': 0.5, 'rate': 1})
+
+# -----------------------------------------------------------------------------  
 # specify basic parameters
 domain_para = {'nx': 120, 'ny': 120, 'dPML': 0.15, 'xx': 2.0, 'yy': 2.0, \
 				'sig0': 1.5, 'p': 2.3}
@@ -52,6 +53,7 @@ fI = fe.interpolate(fe.Constant(0.0), Vreal)
 
 # specify the regularization term
 reg = Regu('L2_1')
+gamma = 0.001   # regularization parameter
 
 drawF = 'False'
 error_all, q_fun_all = [], []
@@ -108,33 +110,38 @@ for freIndx in range(Nkappa):  # loop for frequencies
         Fdqv = (uincR.vector()[:] + cR*uR.vector()[:] - \
                 cI*uI.vector()[:])*uaR.vector()[:] + \
                 (uincI.vector()[:] + cR*uI.vector()[:] + \
-                 cI*uR.vector()[:])*uaI.vector()[:]    
+                 cI*uR.vector()[:])*uaI.vector()[:] 
+        # add the regularization term
+        regrid = reg.evaGrad(q_fun, Vreal)
+        Fdqv = Fdqv + gamma*regrid.vector()[:]
+        # update the scatterer
         q_fun.vector()[:] = q_fun.vector()[:] + 0.01*Fdqv
         #end = time.time()
         #print('3: ', end-start)
         # only assemble coefficients concerned with q_fun
-        #flag = 'simple'
+        flag = 'simple'
         # track the iteration
         iter_num += 1
         print('kappa = {:2}; angle = {:3.2f}; iter_num = {:3}'.format(equ_para['kappa'], \
               equ_para['theta'], iter_num))
-        # evaluation of the error
-        eng1 = fe.assemble(fe.inner(q_funT-q_fun, q_funT-q_fun)*fe.dx)
-        error_temp = eng1/eng2
-        error_all.append(error_temp)
-        print('L2 norm error is {:.2f}%'.format(error_temp*100))  
-        # draw and save the intermediate inversion results
-        if drawF == 'True':
-            plt.figure()
-            fig1 = fe.plot(q_fun)
-            plt.colorbar(fig1)
-            expN = '/home/jjx323/Projects/ISP/ResultsFig/invQ' + str(iter_num) + '.eps'
-            plt.savefig(expN, dpi=150)
-            plt.close()
+    # evaluation of the error
+    eng1 = fe.assemble(fe.inner(q_funT-q_fun, q_funT-q_fun)*fe.dx)
+    error_temp = eng1/eng2
+    error_all.append(error_temp)
+    print('L2 norm error is {:.2f}%'.format(error_temp*100))  
+    # draw and save the intermediate inversion results
+    if drawF == 'True':
+        plt.figure()
+        fig1 = fe.plot(q_fun)
+        plt.colorbar(fig1)
+        expN = '/home/jjx323/Projects/ISP/ResultsFig/invQ' + str(iter_num) + '.eps'
+        plt.savefig(expN, dpi=150)
+        plt.close()
     q_fun_all.append(q_fun.vector()[:])
 
+# -----------------------------------------------------------------------------
 # postprocessing      
-fig2 = my_draw3D(q_fun, [2, 2])
+fig2 = my_draw3D(q_fun, [0, 2, 0, 2])
 #plt.close()
 # save inversion results
 vtkfile = fe.File('/home/jjx323/Projects/ISP/ResultsFig/q_fun_c.pvd')
@@ -144,7 +151,7 @@ np.save('/home/jjx323/Projects/ISP/Results/q_fun_vector_c', [q_fun.vector()[:], 
         domain_para, ['P', order], q_fun_all])
 # error
 plt.figure()
-plt.plot(error_all[0:-1:Ntheta])
+plt.plot(error_all)
 plt.show()
 print('The final L2 norm error is {:.2f}%'.format(error_all[-1]*100))  
 np.save('/home/jjx323/Projects/ISP/Results/errorAll_c', error_all)      

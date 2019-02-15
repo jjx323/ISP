@@ -30,8 +30,8 @@ def genePoints(num=40, typem='full', domainPara={'xx': 2.0, 'yy': 2.0}):
 
 def my_draw3D(fun, ax):
     NMX, NMY = 200, 200
-    xx = np.linspace(0, ax[0], NMX)
-    yy = np.linspace(0, ax[1], NMY)
+    xx = np.linspace(ax[0], ax[1], NMX)
+    yy = np.linspace(ax[2], ax[3], NMY)
     M = np.zeros((NMX, NMY))
     for i in range(NMX):
         for j in range(NMY):
@@ -61,17 +61,23 @@ class Regu(object):
         if self.type == 'L2_0':
             energy = 0.5*fe.inner(sol, sol)*fe.dx
         elif self.type == 'L2_1':
-            energy = 0.5*fe.inner(fe.grad(sol), fe.grad(sol))*fe.dx
-            
+            energy = 0.5*fe.inner(fe.grad(sol), fe.grad(sol))*fe.dx            
         E = fe.assemble(energy)
         return E
     
-    def evaGrad(self, sol):
+    def evaGrad(self, sol, Vreal):
         if self.type == 'L2_0':
-            grad = sol
+            grad = fe.project(sol, Vreal)
         elif self.type == 'L2_1':
-            grad = fe.div(fe.grad(sol))
-    
+            expr = 'dd < x[0] && x[0] < xx-dd && dd < x[1] && x[1] < yy-dd ? 1 : 0 '
+            ce = fe.interpolate(fe.Expression(expr, degree=3, dd=0.05, \
+                                xx=2, yy=2), Vreal)
+#            a_trial, a_test = fe.TrialFunction(Vreal), fe.TestFunction(Vreal)
+#            grad = fe.Function(Vreal)
+#            M = fe.assemble(fe.inner(a_trial, a_test)*fe.dx)
+#            L = fe.assemble(-fe.inner(fe.nabla_grad(sol), fe.nabla_grad(a_test))*fe.dx)
+#            fe.solve(M, grad.vector(), L)
+            grad = fe.project(ce*fe.div(fe.grad(sol)), Vreal)
         return grad
 
 
