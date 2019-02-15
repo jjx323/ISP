@@ -3,13 +3,13 @@ import matplotlib.pyplot as plt
 import fenics as fe 
 import time
 
-from HSolver import *
-from InvFun import *
+from Core.HSolver import *
+from Core.InvFun import *
 
 plt.close()
 # load the measuring data
-uRT = np.load('dataR.npy')
-uIT = np.load('dataI.npy')
+uRT = np.load('/home/jjx323/Projects/ISP/Data/dataRc.npy')
+uIT = np.load('/home/jjx323/Projects/ISP/Data/dataIc.npy')
 
 # specify basic parameters
 domain_para = {'nx': 120, 'ny': 120, 'dPML': 0.15, 'xx': 2.0, 'yy': 2.0, \
@@ -19,7 +19,7 @@ domain = Domain(domain_para)
 domain.geneMesh()
 
 theta_all = np.linspace(0, 2*np.pi, 10)
-kappa_all = [1.0, 2.0, 3.0]#, 4.0, 5.0, 6.0]
+kappa_all = [1.0, 2.0, 3.0, 4.0, 5.0]
 Ntheta, Nkappa = len(theta_all), len(kappa_all)
 NN = Ntheta*Nkappa
 NS = 400    # number of measuring points
@@ -30,7 +30,12 @@ equ_para = {'kappa': 0.0, 'theta': 0.0}
 # init the scatterer
 Fsol = Helmholtz(domain, equ_para)
 Asol = Helmholtz(domain, equ_para)
-Vreal = Fsol.getFunctionSpace('real')
+Vreal, order = Fsol.getFunctionSpace('real')
+
+# specify the true scatterer for test
+qStrT = '5*pow(3*(x[0]-1), 2)*(3*(x[1]-1))*exp(-(pow(3*(x[0]-1), 2)+pow(3*(x[1]-1), 2)))'
+q_funT = fe.interpolate(trueScatterer(qStrT, 3), Vreal)
+eng2 = fe.assemble(fe.inner(q_funT, q_funT)*fe.dx)
 #qFunStr = '((0.5 <= x[0] && x[0] <= 1.5 && 0.5 <= x[1] && x[1] <= 1.5) ? 1 : 0)'
 #q_fun = fe.interpolate(trueScatterer(qFunStr, 3), Vreal)
 q_fun = initScatterer(Vreal, 'Zero')
@@ -40,6 +45,7 @@ fI = fe.interpolate(fe.Constant(0.0), Vreal)
 # specify the regularization term
 reg = Regu('L2_1')
 
+drawF = 'False'
 # loop for inversion
 iter_num = 0
 flag = 'full'   # assemble with all of the coefficients
@@ -58,7 +64,7 @@ for freIndx in range(Nkappa):  # loop for frequencies
         fR.vector()[:] = -(equ_para['kappa']**2)*q_fun.vector()[:]*uincR.vector()[:]
         fI.vector()[:] = -(equ_para['kappa']**2)*q_fun.vector()[:]*uincI.vector()[:]
         # solve equation
-        Fsol.geneForwardMatrix(flag, q_fun, fR, fI)
+        Fsol.geneForwardMatrix(flag, q_fun, equ_para['kappa'], fR, fI)
         #start = time.time()
         Fsol.solve()
         uR, uI = fe.interpolate(Fsol.uReal, Vreal), fe.interpolate(Fsol.uImag, Vreal)
@@ -73,7 +79,7 @@ for freIndx in range(Nkappa):  # loop for frequencies
         # ---------------------------------------------------------------------
         # solve adjoint problem
         # init the source function
-        Asol.geneForwardMatrix(flag, q_fun)  # generate matrixes with source equal to zero
+        Asol.geneForwardMatrix(flag, q_fun, equ_para['kappa'])  # fR and fI is zero
         # add point source
         magnitudeR = -(equ_para['kappa']**2)*resR
         magnitudeI = -(equ_para['kappa']**2)*(-resI)
@@ -98,27 +104,38 @@ for freIndx in range(Nkappa):  # loop for frequencies
         #end = time.time()
         #print('3: ', end-start)
         # only assemble coefficients concerned with q_fun
-        flag = 'simple'
+        #flag = 'simple'
         # track the iteration
         iter_num += 1
         print('Iterate ', iter_num, ' steps')
+        # evaluation of the error
+        eng1 = fe.assemble(fe.inner(q_funT-q_fun, q_funT-q_fun)*fe.dx)
+        error = eng1/eng2
+        print('L2 norm error is {:.2f}%'.format(error*100))  
+        if drawF == 'True':
+            plt.figure()
+            fig1 = fe.plot(q_fun)
+            plt.colorbar(fig1)
+            expN = '/home/jjx323/Projects/ISP/ResultsFig/invQ' + str(iter_num) + '.eps'
+            plt.savefig(expN, dpi=150)
+            plt.close()
 
 # postprocessing      
 # draw the 
-plt.figure()
-fig1 = fe.plot(q_fun)
-plt.colorbar(fig1)
+#plt.figure()
+#fig1 = fe.plot(q_fun)
+#plt.colorbar(fig1)
 #plt.savefig('invQ1.eps', dpi=150)
-#fig2 = my_draw3D(q_fun, [2, 2])
+fig2 = my_draw3D(q_fun, [2, 2])
 #plt.close()
 # save inversion results
-vtkfile = fe.File('q_fun.pvd')
+vtkfile = fe.File('/home/jjx323/Projects/ISP/ResultsFig/q_fun.pvd')
 vtkfile << q_fun
+# save matrix and reconstruct info
+np.save('/home/jjx323/Projects/ISP/Results/q_fun_vector', q_fun.vector()[:], \
+        domain_para, ['P', order])
 # evaluation of the error
-qFunStr = '((0.5 <= x[0] && x[0] <= 1.5 && 0.5 <= x[1] && x[1] <= 1.5) ? 1 : 0)'
-q_funT = fe.interpolate(trueScatterer(qFunStr, 3), Vreal)
 eng1 = fe.assemble(fe.inner(q_funT-q_fun, q_funT-q_fun)*fe.dx)
-eng2 = fe.assemble(fe.inner(q_funT, q_funT)*fe.dx)
 error = eng1/eng2
 print('L2 norm error is {:.2f}%'.format(error*100))        
 

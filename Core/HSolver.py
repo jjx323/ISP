@@ -61,11 +61,11 @@ class Helmholtz(object):
         
     def getFunctionSpace(self, typem, order=2):
         if typem == 'real':
-            return fe.FunctionSpace(self.domain.mesh, 'P', order)
+            return fe.FunctionSpace(self.domain.mesh, 'P', order), order
         elif typem == 'imag':
-            return fe.FunctionSpace(self.domain.mesh, 'P', order)
+            return fe.FunctionSpace(self.domain.mesh, 'P', order), order
         elif typem == 'full':
-            return self.V
+            return self.V, self.order
         
     def get_s1s2(self, V, flag='vector'):
         xx, yy, dPML, sig0_, p_ = self.domain.xx, self.domain.yy, self.domain.dPML,\
@@ -87,10 +87,12 @@ class Helmholtz(object):
         return cR, cI        
         
     
-    def geneForwardMatrix(self, flag='full', q_fun=fe.Constant(0.0), fR=fe.Constant(0.0), \
-                          fI=fe.Constant(0.0)):
+    def geneForwardMatrix(self, flag='full', q_fun=fe.Constant(0.0), kappa=1.0,\
+                          fR=fe.Constant(0.0), fI=fe.Constant(0.0)):
         if self.haveFunctionSpace == False:
             self.geneFunctionSpace()
+            
+        self.kappa = kappa
             
         xx, yy, dPML, sig0_, p_ = self.domain.xx, self.domain.yy, self.domain.dPML,\
                                   self.domain.sig0, self.domain.p

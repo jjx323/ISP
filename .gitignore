@@ -102,3 +102,8 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# Results and Data
+/ResultsFig
+/Results
+/Data
