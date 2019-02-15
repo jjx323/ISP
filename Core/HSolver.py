@@ -124,13 +124,13 @@ class Helmholtz(object):
             return fe.dot(sI, fe.nabla_grad(v))
         
         if flag == 'full':
-            F1 = - fe.inner(sigR(duR)-sigI(duI), fe.nabla_grad(u_R))*(fe.dx) \
-                - fe.inner(sigR(duI)+sigI(duR), fe.nabla_grad(u_I))*(fe.dx) \
-                - fR*u_R*(fe.dx) - fI*u_I*(fe.dx)
-        
+            a1 = - fe.inner(sigR(duR)-sigI(duI), fe.nabla_grad(u_R))*(fe.dx) \
+                - fe.inner(sigR(duI)+sigI(duR), fe.nabla_grad(u_I))*(fe.dx) 
+            L1 = fR*u_R*(fe.dx) + fI*u_I*(fe.dx)
             a2 = fe.inner(angl_fre2*(fe.Constant(1.0)+q_fun)*(cR*duR-cI*duI), u_R)*(fe.dx) \
                  + fe.inner(angl_fre2*(fe.Constant(1.0)+q_fun)*(cR*duI+cI*duR), u_I)*(fe.dx) 
         elif flag == 'simple':
+            L1 = fR*u_R*(fe.dx) + fI*u_I*(fe.dx)
             a2 = fe.inner(angl_fre2*(fe.Constant(1.0)+q_fun)*(cR*duR-cI*duI), u_R)*(fe.dx) \
                  + fe.inner(angl_fre2*(fe.Constant(1.0)+q_fun)*(cR*duI+cI*duR), u_I)*(fe.dx) 
         
@@ -144,7 +144,6 @@ class Helmholtz(object):
         self.u = fe.Function(self.V)
         
         if flag == 'full':
-            a1, L1 = fe.lhs(F1), fe.rhs(F1)
             self.A1 = fe.assemble(a1)
             self.b1 = fe.assemble(L1)
             self.A2 = fe.assemble(a2)
@@ -154,7 +153,10 @@ class Helmholtz(object):
             bc[1].apply(self.A2)
             self.A = self.A1 + self.A2
         elif flag == 'simple':
+            self.b1 = fe.assemble(L1)
             self.A2 = fe.assemble(a2)
+            bc[0].apply(self.b1)
+            bc[1].apply(self.b1)
             bc[0].apply(self.A2)
             bc[1].apply(self.A2)
             self.A = self.A1 + self.A2

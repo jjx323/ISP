@@ -36,9 +36,9 @@ Vreal, order = Fsol.getFunctionSpace('real')
 qStrT = '5*pow(3*(x[0]-1), 2)*(3*(x[1]-1))*exp(-(pow(3*(x[0]-1), 2)+pow(3*(x[1]-1), 2)))'
 q_funT = fe.interpolate(trueScatterer(qStrT, 3), Vreal)
 eng2 = fe.assemble(fe.inner(q_funT, q_funT)*fe.dx)
-#qFunStr = '((0.5 <= x[0] && x[0] <= 1.5 && 0.5 <= x[1] && x[1] <= 1.5) ? 1 : 0)'
-#q_fun = fe.interpolate(trueScatterer(qFunStr, 3), Vreal)
+# init the scatterer 
 q_fun = initScatterer(Vreal, 'Zero')
+# init the force term
 fR = fe.interpolate(fe.Constant(0.0), Vreal)
 fI = fe.interpolate(fe.Constant(0.0), Vreal)
 
@@ -46,6 +46,7 @@ fI = fe.interpolate(fe.Constant(0.0), Vreal)
 reg = Regu('L2_1')
 
 drawF = 'False'
+error_all = []
 # loop for inversion
 iter_num = 0
 flag = 'full'   # assemble with all of the coefficients
@@ -110,8 +111,10 @@ for freIndx in range(Nkappa):  # loop for frequencies
         print('Iterate ', iter_num, ' steps')
         # evaluation of the error
         eng1 = fe.assemble(fe.inner(q_funT-q_fun, q_funT-q_fun)*fe.dx)
-        error = eng1/eng2
-        print('L2 norm error is {:.2f}%'.format(error*100))  
+        error_temp = eng1/eng2
+        error_all.append(error_temp)
+        print('L2 norm error is {:.2f}%'.format(error_temp*100))  
+        # draw and save the intermediate inversion results
         if drawF == 'True':
             plt.figure()
             fig1 = fe.plot(q_fun)
@@ -121,11 +124,6 @@ for freIndx in range(Nkappa):  # loop for frequencies
             plt.close()
 
 # postprocessing      
-# draw the 
-#plt.figure()
-#fig1 = fe.plot(q_fun)
-#plt.colorbar(fig1)
-#plt.savefig('invQ1.eps', dpi=150)
 fig2 = my_draw3D(q_fun, [2, 2])
 #plt.close()
 # save inversion results
@@ -134,9 +132,11 @@ vtkfile << q_fun
 # save matrix and reconstruct info
 np.save('/home/jjx323/Projects/ISP/Results/q_fun_vector', q_fun.vector()[:], \
         domain_para, ['P', order])
-# evaluation of the error
-eng1 = fe.assemble(fe.inner(q_funT-q_fun, q_funT-q_fun)*fe.dx)
-error = eng1/eng2
-print('L2 norm error is {:.2f}%'.format(error*100))        
+# error
+plt.figure()
+plt.plot(error_all)
+plt.show()
+print('L2 norm error is {:.2f}%'.format(error_all[-1]*100))  
+np.save('/home/jjx323/Projects/ISP/Results/errorAll', error_all)      
 
 
