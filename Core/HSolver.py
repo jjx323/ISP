@@ -17,7 +17,8 @@ class Domain(object):
         
     def geneMesh(self):
         dPML, xx, yy, Nx, Ny = self.dPML, self.xx, self.yy, self.nx, self.ny
-        self.mesh = fe.RectangleMesh(fe.Point(-dPML, -dPML), fe.Point(xx+dPML, yy+dPML), Nx, Ny)
+        self.mesh = fe.RectangleMesh(fe.Point(-dPML, -dPML), \
+                                     fe.Point(xx+dPML, yy+dPML), Nx, Ny)
         self.haveMesh = True
         
     def modifyNxNy(self, nx, ny):

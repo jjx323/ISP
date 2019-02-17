@@ -1,5 +1,6 @@
 import numpy as np 
 import matplotlib.pyplot as plt 
+from mpl_toolkits.mplot3d import Axes3D
 import fenics as fe 
 import time
 
@@ -19,8 +20,8 @@ qStrT = dAR[3]
 # add noise to the data
 shapeU = uRT.shape
 for i in range(shapeU[1]):
-    uRT[:,i], _ = addGaussianNoise(uRT[:,i], {'noise_level': 0.5, 'rate': 1})
-    uIT[:,i], _ = addGaussianNoise(uIT[:,i], {'noise_level': 0.5, 'rate': 1})
+    uRT[:,i], _ = addGaussianNoise(uRT[:,i], {'noise_level': 0.3, 'rate': 1})
+    uIT[:,i], _ = addGaussianNoise(uIT[:,i], {'noise_level': 0.3, 'rate': 1})
 
 # -----------------------------------------------------------------------------  
 # specify basic parameters
@@ -53,7 +54,11 @@ fI = fe.interpolate(fe.Constant(0.0), Vreal)
 
 # specify the regularization term
 reg = Regu('L2_1')
-gamma = 0.001   # regularization parameter
+gamma = 0.05   # regularization parameter
+cutL = 0.05
+mesh_res1 = fe.RectangleMesh(fe.Point(cutL, cutL), fe.Point(domain.xx-cutL, \
+                             domain.yy-cutL), 120, 120)
+V_res1 = fe.FunctionSpace(mesh_res, 'P', 2)
 
 drawF = 'False'
 error_all, q_fun_all = [], []
@@ -112,8 +117,17 @@ for freIndx in range(Nkappa):  # loop for frequencies
                 (uincI.vector()[:] + cR*uI.vector()[:] + \
                  cI*uR.vector()[:])*uaI.vector()[:] 
         # add the regularization term
-        regrid = reg.evaGrad(q_fun, Vreal)
-        Fdqv = Fdqv + gamma*regrid.vector()[:]
+#        regrad = extend_smooth(Vreal, reg.evaGrad(extend_smooth(Vreal, q_fun, \
+#                                                    V_res1), Vreal), V_res1)
+        q_fun_res = fe.interpolate(q_fun, V_res1)
+        regrad_res = reg.evaGrad(q_fun_res, V_res1)
+        regrad_res.set_allow_extrapolation(True)
+        regrad = fe.interpolate(regrad_res, Vreal)
+        grad_v = set_edge_zero(regrad.vector()[:], Vreal, domain, cutL)
+        if np.max(grad_v) > 0:
+            Fdqv = Fdqv + gamma*grad_v/np.max(grad_v)
+        else:
+            Fdqv = Fdqv + gamma*grad_v
         # update the scatterer
         q_fun.vector()[:] = q_fun.vector()[:] + 0.01*Fdqv
         #end = time.time()
@@ -141,7 +155,8 @@ for freIndx in range(Nkappa):  # loop for frequencies
 
 # -----------------------------------------------------------------------------
 # postprocessing      
-fig2 = my_draw3D(q_fun, [0, 2, 0, 2])
+#fe.plot(q_fun, mode="warp")
+my_draw3D(q_fun, [-0.15, 2.15, -0.15, 2.15])
 #plt.close()
 # save inversion results
 vtkfile = fe.File('/home/jjx323/Projects/ISP/ResultsFig/q_fun_c.pvd')
@@ -155,5 +170,8 @@ plt.plot(error_all)
 plt.show()
 print('The final L2 norm error is {:.2f}%'.format(error_all[-1]*100))  
 np.save('/home/jjx323/Projects/ISP/Results/errorAll_c', error_all)      
+
+en = fe.assemble(fe.inner(fe.grad(q_fun), fe.grad(q_fun))*fe.dx)
+print('The value of regularization is {:.2f}'.format(en))
 
 

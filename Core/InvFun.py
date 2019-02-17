@@ -29,7 +29,7 @@ def genePoints(num=40, typem='full', domainPara={'xx': 2.0, 'yy': 2.0}):
 
 
 def my_draw3D(fun, ax):
-    NMX, NMY = 200, 200
+    NMX, NMY = 400, 400
     xx = np.linspace(ax[0], ax[1], NMX)
     yy = np.linspace(ax[2], ax[3], NMY)
     M = np.zeros((NMX, NMY))
@@ -52,6 +52,26 @@ def initScatterer(V, method='Zero'):
     if method == 'Zero':
         return fe.interpolate(fe.Constant(0.0), V) 
 
+def extend_smooth(Vt, fun, Vr):
+    fun_res = fe.interpolate(fun, Vr)
+    fun_res.set_allow_extrapolation(True)
+    fun_extend = fe.interpolate(fun_res, Vt)
+    return fun_extend
+
+def set_edge_zero(g, V, domain, dd):
+    n = V.dim()               
+    d =  domain.mesh.geometry().dim()                                                                                                            
+    dof_coordinates = V.tabulate_dof_coordinates()                      
+    dof_coordinates.resize((n, d))                                                   
+    dof_x = dof_coordinates[:, 0]                                                    
+    dof_y = dof_coordinates[:, 1]    
+    
+    g[dof_x < dd] = 0.0
+    g[dof_x > domain.xx-dd] = 0.0
+    g[dof_y < dd] = 0.0
+    g[dof_y > domain.yy-dd] = 0.0
+    
+    return g
 
 class Regu(object):
     def __init__(self, typem='L2_1'):
@@ -69,15 +89,12 @@ class Regu(object):
         if self.type == 'L2_0':
             grad = fe.project(sol, Vreal)
         elif self.type == 'L2_1':
-            expr = 'dd < x[0] && x[0] < xx-dd && dd < x[1] && x[1] < yy-dd ? 1 : 0 '
-            ce = fe.interpolate(fe.Expression(expr, degree=3, dd=0.05, \
-                                xx=2, yy=2), Vreal)
 #            a_trial, a_test = fe.TrialFunction(Vreal), fe.TestFunction(Vreal)
 #            grad = fe.Function(Vreal)
 #            M = fe.assemble(fe.inner(a_trial, a_test)*fe.dx)
 #            L = fe.assemble(-fe.inner(fe.nabla_grad(sol), fe.nabla_grad(a_test))*fe.dx)
 #            fe.solve(M, grad.vector(), L)
-            grad = fe.project(ce*fe.div(fe.grad(sol)), Vreal)
+            grad = fe.project(fe.div(fe.grad(sol)), Vreal)
         return grad
 
 
